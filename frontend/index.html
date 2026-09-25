@@ -33,6 +33,17 @@
             <section id="alerts-area"></section>
             <section id="sensor-grid" class="grid"></section>
 
+            <section id="threshold-panel" style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); margin-top: 25px;">
+                <h3 style="color: #6D4C41; margin-bottom: 12px;">Limiares da bomba</h3>
+                <form id="threshold-form" style="display: flex; flex-wrap: wrap; gap: 12px; align-items: end;">
+                    <label>Dispositivo<br><input id="threshold-device" value="ESP32_Irrigacao_Gabriel" required></label>
+                    <label>Ligar em <=<br><input id="pump-on-limit" type="number" min="0" max="409" required></label>
+                    <label>Desligar em >=<br><input id="pump-off-limit" type="number" min="0" max="409" required></label>
+                    <button type="submit">Salvar limiares</button>
+                    <span id="threshold-feedback" aria-live="polite"></span>
+                </form>
+            </section>
+
             <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); margin-top: 25px;">
                 <h3 style="color: #6D4C41; margin-bottom: 15px; font-size: 1.1rem; font-weight: bold;">Tendência de Umidade do Solo (Últimas Horas)</h3>
                 <div style="position: relative; height: 300px; width: 100%;">

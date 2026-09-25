@@ -1,6 +1,10 @@
 // CONFIGURAÇÃO DA API
 const API_BASE_URL = "http://localhost:3000";
 let umidadeChartInstance = null; // Guarda a instância do gráfico para evitar duplicações ao atualizar
+let thresholds = { pumpOnAtOrBelow: 102, pumpOffAtOrAbove: 103 };
+let leiturasAtuais = [];
+let websocket = null;
+let websocketRetry = 1000;
 
 // Estado global para reter os filtros selecionados na tabela e não resetar ao atualizar
 let filtrosTabela = {
@@ -22,9 +26,27 @@ let filtrosHistorico = {
 function getStatusConfig(item) {
     const valNumerico = parseFloat(item.valor) || 0;
 
-    if (valNumerico <= 20) return { label: "Crítico", color: "#D32F2F", isNumeric: true };
-    if (valNumerico <= 40) return { label: "Atenção", color: "#F9A825", isNumeric: true };
+    if (valNumerico <= thresholds.pumpOnAtOrBelow) return { label: "Crítico", color: "#D32F2F", isNumeric: true };
+    if (valNumerico < thresholds.pumpOffAtOrAbove) return { label: "Atenção", color: "#F9A825", isNumeric: true };
     return { label: "Ideal", color: "#2E7D32", isNumeric: true };
+}
+
+function getDeviceID(item) {
+    return item.deviceID || item.device_id || 'S001';
+}
+
+function formatSensorValue(value) {
+    const numericValue = Number(value);
+    return Number.isFinite(numericValue) ? `${numericValue}/409` : 'N/A';
+}
+
+function updateThresholdForm(config) {
+    thresholds = {
+        pumpOnAtOrBelow: Number(config.pumpOnAtOrBelow),
+        pumpOffAtOrAbove: Number(config.pumpOffAtOrAbove)
+    };
+    document.getElementById('pump-on-limit').value = thresholds.pumpOnAtOrBelow;
+    document.getElementById('pump-off-limit').value = thresholds.pumpOffAtOrAbove;
 }
 
 // 1. Renderização do Dashboard com Carrossel Horizontal Expandido
@@ -67,19 +89,18 @@ function renderizarDashboard(listaSensores) {
     if (alertArea) alertArea.innerHTML = '';
 
     // Filtra pelo device_id mapeado no novo BD
-    const leiturasS001 = listaSensores.filter(sensor => (sensor.device_id || 'S001') === 'S001');
-    const ultimasLeituras = leiturasS001.slice(0, 10); 
+    const ultimasLeituras = listaSensores.slice(0, 10); 
     const dispositivosComAlerta = new Set();
 
     ultimasLeituras.forEach((sensor, index) => {
         const config = getStatusConfig(sensor);
-        const valorLimpo = String(sensor.valor).replace('%', '');
-        const idDispositivo = sensor.device_id || 'S001';
+        const valorLimpo = formatSensorValue(sensor.valor);
+        const idDispositivo = getDeviceID(sensor);
         const statusBomba = sensor.statusBomba || 'Desconhecido';
-        const corBomba = statusBomba.toLowerCase() === 'ligada' ? '#2E7D32' : '#D32F2F';
+        const corBomba = statusBomba.toLowerCase() === 'ligado' ? '#2E7D32' : '#D32F2F';
 
         const valNumerico = parseFloat(valorLimpo) || 0;
-        const porcentagemBarra = Math.min(Math.max(valNumerico, 0), 100);
+        const porcentagemBarra = Math.min(Math.max((valNumerico / 409) * 100, 0), 100);
 
         const dataObj = sensor.timestamp ? new Date(sensor.timestamp) : new Date();
         const horaMinuto = dataObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
@@ -144,7 +165,7 @@ function renderizarDashboard(listaSensores) {
             <h3 style="margin:5px 0; color:#333; font-size:1rem;">Medição: ${tipoPropriedade}</h3>
             
             <div style="font-size:2.5rem; font-weight:bold; color:#2c3e50; margin:10px 0;">
-                ${valorLimpo}${config.isNumeric ? '%' : ''}
+                ${valorLimpo}
             </div>
             
             ${config.isNumeric ? `
@@ -203,10 +224,10 @@ function abrirModalDetalhes(sensor, labelTempoCard) {
     if (modalExistente) modalExistente.remove();
 
     const config = getStatusConfig(sensor);
-    const valorLimpo = String(sensor.valor).replace('%', '');
-    const idDispositivo = sensor.device_id || 'S001';
+    const valorLimpo = formatSensorValue(sensor.valor);
+    const idDispositivo = getDeviceID(sensor);
     const statusBomba = sensor.statusBomba || 'Desconhecido';
-    const corBomba = statusBomba.toLowerCase() === 'ligada' ? '#2E7D32' : '#D32F2F';
+    const corBomba = statusBomba.toLowerCase() === 'ligado' ? '#2E7D32' : '#D32F2F';
     const tipoPropriedade = sensor.propriedade ? String(sensor.propriedade) : 'Umidade';
     
     const dataObj = sensor.timestamp ? new Date(sensor.timestamp) : new Date();
@@ -242,7 +263,7 @@ function abrirModalDetalhes(sensor, labelTempoCard) {
                 </div>
                 <div style="display: flex; justify-content: space-between; border-bottom: 1px solid #f9f9f9; padding-bottom: 8px; align-items: center;">
                     <span style="color: #777; font-weight: 500;">Valor Coletado:</span>
-                    <span style="font-size: 1.3rem; font-weight: bold; color: #2c3e50;">${valorLimpo}${config.isNumeric ? '%' : ''}</span>
+                    <span style="font-size: 1.3rem; font-weight: bold; color: #2c3e50;">${valorLimpo}</span>
                 </div>
                 <div style="display: flex; justify-content: space-between; border-bottom: 1px solid #f9f9f9; padding-bottom: 8px; align-items: center;">
                     <span style="color: #777; font-weight: 500;">Status do Solo:</span>
@@ -293,7 +314,7 @@ function renderizarTabelaSensores(listaSensores) {
     const container = document.getElementById('sensores-table-container');
     if (!container) return;
 
-    const IDsUnicos = [...new Set(listaSensores.map(s => s.device_id || 'S001'))];
+    const IDsUnicos = [...new Set(listaSensores.map(getDeviceID))];
     const propriedadesUnicas = [...new Set(listaSensores.map(s => s.propriedade ? String(s.propriedade) : 'Umidade'))];
     const statusUnicos = [...new Set(listaSensores.map(s => getStatusConfig(s).label))];
 
@@ -301,7 +322,7 @@ function renderizarTabelaSensores(listaSensores) {
         const config = getStatusConfig(sensor);
         const propString = sensor.propriedade ? String(sensor.propriedade) : 'Umidade';
         
-        const matchID = filtrosTabela.device_id === "" || (sensor.device_id || 'S001') === filtrosTabela.device_id;
+        const matchID = filtrosTabela.device_id === "" || getDeviceID(sensor) === filtrosTabela.device_id;
         const matchProp = filtrosTabela.propriedade === "" || propString === filtrosTabela.propriedade;
         const matchStatus = filtrosTabela.status === "" || config.label === filtrosTabela.status;
         
@@ -380,10 +401,9 @@ function renderizarTabelaSensores(listaSensores) {
     } else {
         listaFiltrada.forEach(sensor => {
             const config = getStatusConfig(sensor);
-            const valorLimpo = String(sensor.valor).replace('%', '');
-            const valorFormatado = valorLimpo + (config.isNumeric ? '%' : '');
+            const valorFormatado = formatSensorValue(sensor.valor);
             const statusBomba = sensor.statusBomba || 'Desconhecido';
-            const corBomba = statusBomba.toLowerCase() === 'ligada' ? '#2E7D32' : '#D32F2F';
+            const corBomba = statusBomba.toLowerCase() === 'ligado' ? '#2E7D32' : '#D32F2F';
             const tipoPropriedade = sensor.propriedade ? String(sensor.propriedade) : 'Umidade';
             
             const dataObj = sensor.timestamp ? new Date(sensor.timestamp) : new Date();
@@ -392,7 +412,7 @@ function renderizarTabelaSensores(listaSensores) {
 
             htmlTabela += `
                 <tr style="border-bottom: 1px solid #eeeeee;">
-                    <td style="padding: 15px; font-weight: bold; color: #2c3e50;">${sensor.device_id || 'S001'}</td>
+                    <td style="padding: 15px; font-weight: bold; color: #2c3e50;">${getDeviceID(sensor)}</td>
                     <td style="padding: 15px; color: #555;">${tipoPropriedade}</td>
                     <td style="padding: 15px; font-weight: bold; color: #2c3e50;">${valorFormatado}</td>
                     <td style="padding: 15px;">
@@ -443,7 +463,7 @@ function renderizarHistorico(listaHistorico) {
         return "#555";
     };
 
-    const IDsUnicos = [...new Set(listaHistorico.map(log => log.device_id || 'S001'))];
+    const IDsUnicos = [...new Set(listaHistorico.map(getDeviceID))];
     const propriedadesUnicas = [...new Set(listaHistorico.map(log => log.propriedade ? String(log.propriedade) : 'Umidade'))];
     const statusUnicos = [...new Set(listaHistorico.map(log => getStatusConfig(log).label))];
 
@@ -452,7 +472,7 @@ function renderizarHistorico(listaHistorico) {
         const statusTexto = configProvisoria.label;
         const propString = log.propriedade ? String(log.propriedade) : 'Umidade';
 
-        const matchID = filtrosHistorico.device_id === "" || (log.device_id || 'S001') === filtrosHistorico.device_id;
+        const matchID = filtrosHistorico.device_id === "" || getDeviceID(log) === filtrosHistorico.device_id;
         const matchProp = filtrosHistorico.propriedade === "" || propString === filtrosHistorico.propriedade;
         const matchStatus = filtrosHistorico.status === "" || statusTexto === filtrosHistorico.status;
         
@@ -534,17 +554,17 @@ function renderizarHistorico(listaHistorico) {
             const statusTexto = configProvisoria.label;
             const corStatus = obterCorStatus(statusTexto);
             const dataFormatada = log.timestamp ? new Date(log.timestamp).toLocaleString('pt-BR') : new Date().toLocaleString('pt-BR');
-            const valorLimpo = String(log.valor).replace('%', '');
+            const valorLimpo = formatSensorValue(log.valor);
             const statusBomba = log.statusBomba || 'Desconhecido';
-            const corBomba = statusBomba.toLowerCase() === 'ligada' ? '#2E7D32' : '#D32F2F';
+            const corBomba = statusBomba.toLowerCase() === 'ligado' ? '#2E7D32' : '#D32F2F';
             const tipoPropriedade = log.propriedade ? String(log.propriedade) : 'Umidade';
 
             htmlHistorico += `
                 <tr style="border-bottom: 1px solid #eeeeee;">
                     <td style="padding: 15px; color: #666; font-size: 0.85rem;">${dataFormatada}</td>
-                    <td style="padding: 15px; font-weight: bold; color: #2c3e50;">${log.device_id || 'S001'}</td>
+                    <td style="padding: 15px; font-weight: bold; color: #2c3e50;">${getDeviceID(log)}</td>
                     <td style="padding: 15px; color: #555;">${tipoPropriedade}</td>
-                    <td style="padding: 15px; font-weight: bold; color: #2c3e50;">${valorLimpo}${configProvisoria.isNumeric ? '%' : ''}</td>
+                    <td style="padding: 15px; font-weight: bold; color: #2c3e50;">${valorLimpo}</td>
                     <td style="padding: 15px;">
                         <span style="background:${corStatus}22; color:${corStatus}; padding:2px 10px; border-radius:12px; font-size:0.7rem; font-weight:bold;">
                             ${statusTexto}
@@ -587,8 +607,8 @@ function inicializarGrafico(listaSensores) {
 
     // Filtra dados para o gráfico garantindo que pegue o device_id atualizado
     const dadosRelevantes = listaSensores.filter(s => true); 
-    const rotasHoras = dadosRelevantes.map(s => s.device_id ? s.device_id : 'Sensor');
-    const valoresNumericos = dadosRelevantes.map(s => parseFloat(String(s.valor).replace('%', '')) || 0);
+    const rotasHoras = dadosRelevantes.map(getDeviceID);
+    const valoresNumericos = dadosRelevantes.map(s => ((parseFloat(s.valor) || 0) / 409) * 100);
 
     construirGraficoEfetivo(canvas, rotasHoras, valoresNumericos);
 }
@@ -633,12 +653,73 @@ async function buscarDadosSensores() {
         if (!response.ok) throw new Error("Erro na requisição dos sensores");
 
         const dados = await response.json();
+        leiturasAtuais = dados;
         renderizarDashboard(dados);
         renderizarTabelaSensores(dados);
     } catch (error) {
         console.error("Falha ao carregar sensores do back-end:", error);
         exibirMensagemErro('sensor-grid', 'Não foi possível conectar ao servidor de sensores.');
         exibirMensagemErro('sensores-table-container', 'Não foi possível carregar a tabela de sensores.');
+    }
+}
+
+async function buscarConfiguracao(deviceID) {
+    const response = await fetch(`${API_BASE_URL}/config/thresholds/${encodeURIComponent(deviceID)}`);
+    if (!response.ok) throw new Error('Configuração não encontrada');
+    updateThresholdForm(await response.json());
+}
+
+function conectarWebSocket() {
+    const websocketUrl = `${API_BASE_URL.replace(/^http/, 'ws')}/ws`;
+    websocket = new WebSocket(websocketUrl);
+
+    websocket.onopen = () => {
+        websocketRetry = 1000;
+        console.info('WebSocket conectado');
+    };
+
+    websocket.onmessage = (event) => {
+        const message = JSON.parse(event.data);
+        if (message.type === 'reading.created') {
+            leiturasAtuais = [message.payload, ...leiturasAtuais].slice(0, 100);
+            renderizarDashboard(leiturasAtuais);
+            renderizarTabelaSensores(leiturasAtuais);
+            renderizarHistorico(leiturasAtuais);
+        }
+        if (message.type === 'thresholds.updated' && message.payload.deviceID === getDeviceID({ deviceID: document.getElementById('threshold-device').value })) {
+            updateThresholdForm(message.payload);
+        }
+    };
+
+    websocket.onclose = () => {
+        setTimeout(conectarWebSocket, websocketRetry);
+        websocketRetry = Math.min(websocketRetry * 2, 30000);
+    };
+}
+
+async function salvarConfiguracao(event) {
+    event.preventDefault();
+    const deviceID = document.getElementById('threshold-device').value.trim();
+    const payload = {
+        pumpOnAtOrBelow: Number(document.getElementById('pump-on-limit').value),
+        pumpOffAtOrAbove: Number(document.getElementById('pump-off-limit').value)
+    };
+    const feedback = document.getElementById('threshold-feedback');
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/config/thresholds/${encodeURIComponent(deviceID)}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.erro || 'Falha ao salvar limiares');
+        updateThresholdForm(result);
+        feedback.textContent = 'Limiar salvo.';
+        feedback.style.color = '#2E7D32';
+    } catch (error) {
+        feedback.textContent = error.message;
+        feedback.style.color = '#D32F2F';
     }
 }
 
@@ -669,6 +750,9 @@ function exibirMensagemErro(elementId, message) {
 document.addEventListener('DOMContentLoaded', () => {
     buscarDadosSensores();
     buscarDadosHistorico();
+    buscarConfiguracao(document.getElementById('threshold-device').value).catch(console.error);
+    conectarWebSocket();
+    document.getElementById('threshold-form').addEventListener('submit', salvarConfiguracao);
 
     const navLinks = document.querySelectorAll(".nav-links a");
     const sections = document.querySelectorAll(".tab-content");

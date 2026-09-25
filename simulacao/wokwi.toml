@@ -2,3 +2,5 @@
 version = 1
 firmware = '/build/simulacao.ino.bin'
 elf = 'path-to-your-firmware.elf'
+[net]
+gateway="ws://localhost:9011"

@@ -3,6 +3,8 @@
 #include <NTPClient.h>
 #include <WiFiUdp.h>
 #include <ESP32Servo.h>
+#include <WebServer.h>
+#include <ArduinoJson.h>
 
 // --- Configurações e Pinos ---
 const char* ssid = "Wokwi-GUEST";
@@ -20,6 +22,8 @@ PubSubClient client(espClient);
 WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP, "pool.ntp.org", -10800, 60000);
 Servo servo;
+WebServer controlServer(80);
+bool comandoBombaRecebido = false;
 
 // --- 1. MÓDULO DE TEMPO E COMUNICAÇÃO ---
 
@@ -57,57 +61,47 @@ void moverServo(int angulo) {
 }
 
 bool statusBomba(bool estado) {
-  digitalWrite(PIN_RELE, estado ? HIGH : LOW);
+  digitalWrite(PIN_RELE, estado ? LOW : HIGH);
   return estado;
 }
 
 char* statusBomba() {
-  if (digitalRead(PIN_RELE) == HIGH) return "ligado";
+  if (digitalRead(PIN_RELE) == LOW) return "ligado";
   else return "desligado";
 }
 
-void analisarEAgir(float umidade) {
-  // Lógica 1: Controle do Relé (Bomba)
-  if(!umidade == 0){
+void aplicarComandoBomba(bool ligar) {
+  statusBomba(ligar);
+  moverServo(ligar ? 90 : 0);
+  comandoBombaRecebido = true;
+}
 
-    switch ((int)umidade)
-    {
-    case 1 ... 102:
-      statusBomba(true);
-      //Serial.println("Bomba ligada");
-      //Serial.println("Critico");
-      moverServo(90);
-      break;
-    case 103 ... 205:
-      statusBomba(false);
-      //Serial.println("Bomba desligada");
-      //Serial.println("Perigo! Solo quase seco");
-      moverServo(0);
-      break;
-    case 206 ... 307:
-      statusBomba(false);
-      //Serial.println("Bomba desligada");
-      //Serial.println("Ideal! Solo úmido");
-      moverServo(0);
-      break;
-    case 308 ... 409:
-      statusBomba(false);
-      //Serial.println("Bomba desligada");
-      //Serial.println("Muito úmido! Solo saturado");
-      moverServo(0);
-      break;
-    default:
-      break;
-    }
-  }else{
-    statusBomba(true);
-    //Serial.println("Bomba ligada");
-    //Serial.println("Critico");
-    moverServo(90);
+void handleBomba() {
+  StaticJsonDocument<256> payload;
+  DeserializationError erro = deserializeJson(payload, controlServer.arg("plain"));
+
+  if (erro) {
+    controlServer.send(400, "application/json", "{\"erro\":\"JSON invalido\"}");
+    return;
   }
-  
-  // Lógica 2: Espaço reservado para o Servo Motor
-  // if (umidade < X) { moverServo(90); }
+
+  const char* deviceID = payload["deviceID"];
+  if (!deviceID || String(deviceID) != String(deviceName) || !payload["ligar"].is<bool>()) {
+    controlServer.send(400, "application/json", "{\"erro\":\"deviceID ou ligar invalido\"}");
+    return;
+  }
+
+  bool ligar = payload["ligar"].as<bool>();
+  aplicarComandoBomba(ligar);
+
+  StaticJsonDocument<192> resposta;
+  resposta["deviceID"] = deviceName;
+  resposta["statusBomba"] = ligar ? "ligado" : "desligado";
+  resposta["valorBruto"] = payload["valorBruto"] | -1;
+
+  String respostaJson;
+  serializeJson(resposta, respostaJson);
+  controlServer.send(200, "application/json", respostaJson);
 }
 
 // --- 3. INFRAESTRUTURA (WiFi/MQTT) ---
@@ -140,22 +134,27 @@ void setup() {
   
   pinMode(PIN_POT, INPUT);
   pinMode(PIN_RELE, OUTPUT);
+  digitalWrite(PIN_RELE, HIGH); // relé ativo em LOW
 
   servo.attach(PIN_SERVO);
   servo.write(0);
 
   client.setServer(mqtt_server, 1883);
+  controlServer.on("/bomba", HTTP_POST, handleBomba);
+  controlServer.begin();
+  Serial.println("Servidor HTTP de controle iniciado na porta 80");
+  Serial.println("No Wokwi IoT Gateway, acesse este servidor pela porta local 9080");
 }
 
 void loop() {
   if (!client.connected()) reconnect();
   client.loop();
+  controlServer.handleClient();
   timeClient.update();
 
   // Fluxo simplificado e organizado:
   float umidadeAtual = lerUmidade();
-  analisarEAgir(umidadeAtual);
   enviarTelemetria(umidadeAtual);
 
-  delay(2000); // Frequência de atualização
+  delay(5000); // Frequência de atualização
 }
