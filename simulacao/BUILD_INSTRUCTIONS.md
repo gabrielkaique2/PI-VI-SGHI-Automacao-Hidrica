@@ -124,7 +124,32 @@ find /home/{your_user}/PI5/PI-V-SGHI-Automacao-Hidrica/simulacao/build -type f -
 
 ESP32 builds normally produce `.bin` and `.elf`. A `.hex` file is not required for flashing an ESP32.
 
-## 7) Verify MQTT broker messages
+## 7) Install Mosquitto on Windows
+
+To use `mosquitto_sub` from PowerShell, download and run the Mosquitto 2.1.2 Windows x64 installer, `mosquitto-2.1.2-install-windows-x64.exe`, from the [official Mosquitto download page](https://mosquitto.org/download/). Keep the default installation directory:
+
+```text
+C:\Program Files\Mosquitto
+```
+
+Add this directory to the Windows `Path` environment variable:
+
+1. Open **System Properties** and select **Environment Variables**.
+2. Under **User variables** or **System variables**, select `Path` and choose **Edit**.
+3. Choose **New**, enter `C:\Program Files\Mosquitto`, and confirm all dialogs.
+4. Open a new PowerShell window and verify that the command is available:
+
+```powershell
+Get-Command mosquitto_sub
+```
+
+If you only need to update the current PowerShell session, run:
+
+```powershell
+$env:Path += ";C:\Program Files\Mosquitto"
+```
+
+## 8) Verify MQTT broker messages
 
 In PowerShell, subscribe to the telemetry topic:
 
@@ -134,7 +159,7 @@ mosquitto_sub -h broker.hivemq.com -t "sensor/umidade"
 
 Keep this terminal open while the ESP32 sketch is running. Published messages from the `sensor/umidade` topic will appear in the terminal.
 
-## 8) Convert ELF to Intel HEX (optional)
+## 9) Convert ELF to Intel HEX (optional)
 
 ```bash
 # locate the .elf produced by the previous step then:
@@ -143,7 +168,7 @@ xtensa-esp32-elf-objcopy -O ihex /path/to/sketch.elf /home/{your_user}/PI5/PI-V-
 
 If `xtensa-esp32-elf-objcopy` is not on your PATH, it is usually available inside the ESP32 toolchain installed by `arduino-cli` (look under `~/.arduino15/packages/esp32/`).
 
-## 9) Flashing example
+## 10) Flashing example
 
 Using `arduino-cli` (replace the port and fqbn as required):
 
