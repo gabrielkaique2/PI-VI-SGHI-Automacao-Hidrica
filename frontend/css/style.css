@@ -32,3 +32,27 @@ body { font-family: 'Segoe UI', sans-serif; background-color: var(--fundo-claro)
 .hidden {
     display: none !important;
 }
+
+    .auth-screen { min-height: 100vh; display: grid; place-items: center; padding: 24px; box-sizing: border-box; background: radial-gradient(circle at 15% 85%, #d9ece0 0, transparent 32%), linear-gradient(135deg, #eef4ed, #f7f5ed); }
+    .auth-panel { width: min(100%, 390px); display: grid; gap: 12px; padding: 32px; box-sizing: border-box; background: white; border-top: 4px solid var(--verde-saude); box-shadow: 0 12px 38px rgba(35, 63, 41, 0.12); }
+    .auth-panel h1 { margin: 0 0 8px; color: #263b2c; font-size: 1.7rem; }
+    .auth-eyebrow { margin: 0; color: var(--verde-saude); font-size: 0.85rem; font-weight: 700; }
+    .auth-panel input, .user-create-form input, .user-create-form select, .users-table input, .users-table select { min-width: 0; padding: 10px; border: 1px solid #b9c7bd; border-radius: 4px; font: inherit; }
+    .auth-panel button, .user-create-form button, .users-table button, .session-controls button { padding: 10px 16px; border: 0; border-radius: 4px; color: white; background: var(--verde-saude); font: inherit; font-weight: 600; cursor: pointer; }
+    .form-feedback { min-height: 1.25em; margin: 0; color: var(--vermelho-alerta); font-size: 0.9rem; }
+    .session-controls { display: flex; align-items: center; gap: 12px; color: #394b3d; font-size: 0.85rem; }
+    .user-create-form { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; margin: 18px 0 24px; padding: 16px; background: white; }
+    .user-create-form label { display: grid; gap: 5px; flex: 1 1 180px; }
+    .users-table { width: 100%; border-collapse: collapse; background: white; }
+    .users-table th, .users-table td { padding: 10px; border-bottom: 1px solid #e2e8e3; text-align: left; }
+    .users-table td input, .users-table td select { width: 100%; box-sizing: border-box; }
+    .users-table .user-password { min-width: 150px; }
+    .users-table .deactivate-button { background: #9e332b; }
+
+    @media (max-width: 760px) {
+        .nav-content { padding: 0 10px; gap: 8px; }
+        .nav-links { gap: 10px; padding: 0; margin: 0; font-size: 0.8rem; }
+        .session-controls span { display: none; }
+        .user-create-form { align-items: stretch; }
+        .users-table { display: block; overflow-x: auto; }
+    }

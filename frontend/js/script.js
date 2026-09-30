@@ -1,10 +1,23 @@
 // CONFIGURAÇÃO DA API
-const API_BASE_URL = "http://localhost:3000";
+const API_BASE_URL = `http://${window.location.hostname || 'localhost'}:3000`;
 let umidadeChartInstance = null; // Guarda a instância do gráfico para evitar duplicações ao atualizar
 let thresholds = { pumpOnAtOrBelow: 102, pumpOffAtOrAbove: 103 };
 let leiturasAtuais = [];
 let websocket = null;
 let websocketRetry = 1000;
+let currentUser = null;
+let applicationInitialized = false;
+
+async function apiFetch(route, options = {}) {
+    const response = await fetch(`${API_BASE_URL}${route}`, {
+        ...options,
+        credentials: 'include'
+    });
+    if (response.status === 401 && currentUser && route !== '/auth/logout') {
+        showLogin('Sua sessão expirou. Entre novamente.');
+    }
+    return response;
+}
 
 // Estado global para reter os filtros selecionados na tabela e não resetar ao atualizar
 let filtrosTabela = {
@@ -649,7 +662,7 @@ function construirGraficoEfetivo(canvas, labels, dados) {
 // --- FUNÇÕES ASYNC PARA CHAMADAS DE API ---
 async function buscarDadosSensores() {
     try {
-        const response = await fetch(`${API_BASE_URL}/leituras`);
+        const response = await apiFetch('/leituras');
         if (!response.ok) throw new Error("Erro na requisição dos sensores");
 
         const dados = await response.json();
@@ -664,12 +677,13 @@ async function buscarDadosSensores() {
 }
 
 async function buscarConfiguracao(deviceID) {
-    const response = await fetch(`${API_BASE_URL}/config/thresholds/${encodeURIComponent(deviceID)}`);
+    const response = await apiFetch(`/config/thresholds/${encodeURIComponent(deviceID)}`);
     if (!response.ok) throw new Error('Configuração não encontrada');
     updateThresholdForm(await response.json());
 }
 
 function conectarWebSocket() {
+    if (!currentUser) return;
     const websocketUrl = `${API_BASE_URL.replace(/^http/, 'ws')}/ws`;
     websocket = new WebSocket(websocketUrl);
 
@@ -692,8 +706,19 @@ function conectarWebSocket() {
     };
 
     websocket.onclose = () => {
-        setTimeout(conectarWebSocket, websocketRetry);
+        websocket = null;
+        if (!currentUser) return;
+        const retryDelay = websocketRetry;
         websocketRetry = Math.min(websocketRetry * 2, 30000);
+        setTimeout(async () => {
+            if (!currentUser) return;
+            try {
+                const response = await apiFetch('/auth/me');
+                if (response.ok) conectarWebSocket();
+            } catch (error) {
+                console.error('Falha ao validar a sessão para reconectar:', error);
+            }
+        }, retryDelay);
     };
 }
 
@@ -707,7 +732,7 @@ async function salvarConfiguracao(event) {
     const feedback = document.getElementById('threshold-feedback');
 
     try {
-        const response = await fetch(`${API_BASE_URL}/config/thresholds/${encodeURIComponent(deviceID)}`, {
+        const response = await apiFetch(`/config/thresholds/${encodeURIComponent(deviceID)}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
@@ -725,7 +750,7 @@ async function salvarConfiguracao(event) {
 
 async function buscarDadosHistorico() {
     try {
-        const response = await fetch(`${API_BASE_URL}/leituras`);
+        const response = await apiFetch('/leituras');
         if (!response.ok) throw new Error("Erro na requisição do histórico");
 
         const dados = await response.json();
@@ -746,36 +771,178 @@ function exibirMensagemErro(elementId, message) {
     }
 }
 
-// Inicialização do ecossistema SPA
-document.addEventListener('DOMContentLoaded', () => {
-    buscarDadosSensores();
-    buscarDadosHistorico();
-    buscarConfiguracao(document.getElementById('threshold-device').value).catch(console.error);
-    conectarWebSocket();
-    document.getElementById('threshold-form').addEventListener('submit', salvarConfiguracao);
+function showLogin(message = '') {
+    currentUser = null;
+    if (websocket) websocket.close();
+    websocket = null;
+    document.getElementById('application-root').classList.add('hidden');
+    document.getElementById('auth-screen').classList.remove('hidden');
+    document.getElementById('login-feedback').textContent = message;
+}
 
-    const navLinks = document.querySelectorAll(".nav-links a");
-    const sections = document.querySelectorAll(".tab-content");
+function showApplication(user) {
+    currentUser = user;
+    document.getElementById('auth-screen').classList.add('hidden');
+    document.getElementById('application-root').classList.remove('hidden');
+    document.getElementById('session-user').textContent = `${user.nome} · ${user.papel}`;
+    document.getElementById('users-nav-item').classList.toggle('hidden', user.papel !== 'admin');
+    document.getElementById('threshold-panel').classList.toggle('hidden', user.papel === 'consulta');
 
-    navLinks.forEach(link => {
-        link.addEventListener("click", (event) => {
-            event.preventDefault();
+    if (!applicationInitialized) {
+        applicationInitialized = true;
+        document.getElementById('threshold-form').addEventListener('submit', salvarConfiguracao);
+        document.getElementById('user-create-form').addEventListener('submit', criarUsuario);
+        document.getElementById('logout-button').addEventListener('click', sair);
 
-            const targetId = link.getAttribute("data-target");
-            if (!targetId) return;
+        const navLinks = document.querySelectorAll('.nav-links a');
+        const sections = document.querySelectorAll('.tab-content');
+        navLinks.forEach((link) => {
+            link.addEventListener('click', (event) => {
+                event.preventDefault();
+                const targetId = link.getAttribute('data-target');
+                if (!targetId || (targetId === 'usuarios' && currentUser.papel !== 'admin')) return;
 
-            navLinks.forEach(l => l.classList.remove("active"));
-            link.classList.add("active");
+                navLinks.forEach((navLink) => navLink.classList.remove('active'));
+                link.classList.add('active');
+                sections.forEach((section) => section.classList.toggle('hidden', section.id !== targetId));
 
-            sections.forEach(section => {
-                if (section.id === targetId) {
-                    section.classList.remove("hidden");
-                    if (targetId === "dashboard" || targetId === "sensores") buscarDadosSensores();
-                    if (targetId === "historico") buscarDadosHistorico();
-                } else {
-                    section.classList.add("hidden");
-                }
+                if (targetId === 'dashboard' || targetId === 'sensores') buscarDadosSensores();
+                if (targetId === 'historico') buscarDadosHistorico();
+                if (targetId === 'usuarios') carregarUsuarios();
             });
         });
+    }
+
+    buscarDadosSensores();
+    buscarDadosHistorico();
+    if (user.papel !== 'consulta') {
+        buscarConfiguracao(document.getElementById('threshold-device').value).catch(console.error);
+    }
+    websocketRetry = 1000;
+    conectarWebSocket();
+}
+
+function escapeHtml(value) {
+    return String(value).replace(/[&<>"']/g, (character) => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    })[character]);
+}
+
+async function carregarUsuarios() {
+    const container = document.getElementById('users-table-container');
+    const response = await apiFetch('/usuarios');
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.erro || 'Não foi possível carregar os usuários.');
+
+    container.innerHTML = `
+        <table class="users-table">
+            <thead><tr><th>Nome</th><th>Email</th><th>Papel</th><th>Ativo</th><th>Nova senha</th><th>Ações</th></tr></thead>
+            <tbody>${result.map((user) => `
+                <tr data-user-id="${user.id}">
+                    <td><input data-field="nome" maxlength="100" value="${escapeHtml(user.nome)}" aria-label="Nome"></td>
+                    <td><input data-field="email" type="email" maxlength="254" value="${escapeHtml(user.email)}" aria-label="Email"></td>
+                    <td><select data-field="papel" aria-label="Papel">
+                        <option value="consulta" ${user.papel === 'consulta' ? 'selected' : ''}>Consulta</option>
+                        <option value="operador" ${user.papel === 'operador' ? 'selected' : ''}>Operador</option>
+                        <option value="admin" ${user.papel === 'admin' ? 'selected' : ''}>Administrador</option>
+                    </select></td>
+                    <td><input data-field="ativo" type="checkbox" ${user.ativo ? 'checked' : ''} aria-label="Ativo"></td>
+                    <td><input data-field="senha" class="user-password" type="password" minlength="12" maxlength="128" placeholder="Opcional" aria-label="Nova senha"></td>
+                    <td><button type="button" data-action="save">Salvar</button> <button type="button" class="deactivate-button" data-action="deactivate">Desativar</button></td>
+                </tr>`).join('')}
+            </tbody>
+        </table>`;
+
+    container.onclick = async (event) => {
+        const action = event.target.dataset.action;
+        if (!action) return;
+        const row = event.target.closest('tr[data-user-id]');
+        if (!row) return;
+        const feedback = document.getElementById('user-feedback');
+        try {
+            let response;
+            if (action === 'deactivate') {
+                if (!window.confirm('Desativar este usuário?')) return;
+                response = await apiFetch(`/usuarios/${row.dataset.userId}`, { method: 'DELETE' });
+            } else {
+                const payload = {
+                    nome: row.querySelector('[data-field="nome"]').value,
+                    email: row.querySelector('[data-field="email"]').value,
+                    papel: row.querySelector('[data-field="papel"]').value,
+                    ativo: row.querySelector('[data-field="ativo"]').checked
+                };
+                const password = row.querySelector('[data-field="senha"]').value;
+                if (password) payload.senha = password;
+                response = await apiFetch(`/usuarios/${row.dataset.userId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+            }
+            const body = response.status === 204 ? {} : await response.json();
+            if (!response.ok) throw new Error(body.erro || 'Falha ao salvar usuário.');
+            feedback.textContent = 'Usuário atualizado.';
+            await carregarUsuarios();
+        } catch (error) {
+            feedback.textContent = error.message;
+        }
+    };
+}
+
+async function criarUsuario(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const feedback = document.getElementById('user-feedback');
+    const payload = Object.fromEntries(new FormData(form));
+    try {
+        const response = await apiFetch('/usuarios', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.erro || 'Falha ao criar usuário.');
+        form.reset();
+        feedback.textContent = 'Usuário criado.';
+        await carregarUsuarios();
+    } catch (error) {
+        feedback.textContent = error.message;
+    }
+}
+
+async function sair() {
+    try {
+        await apiFetch('/auth/logout', { method: 'POST' });
+    } finally {
+        showLogin();
+    }
+}
+
+async function iniciarSessao() {
+    const form = document.getElementById('login-form');
+    form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const feedback = document.getElementById('login-feedback');
+        const fields = new FormData(form);
+        try {
+            const response = await apiFetch('/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: fields.get('email'), senha: fields.get('senha') })
+            });
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.erro || 'Falha ao entrar.');
+            form.reset();
+            showApplication(result.usuario);
+        } catch (error) {
+            feedback.textContent = error.message;
+        }
     });
-});
+
+    const response = await apiFetch('/auth/me');
+    if (!response.ok) return showLogin();
+    const result = await response.json();
+    showApplication(result.usuario);
+}
+
+document.addEventListener('DOMContentLoaded', iniciarSessao);

@@ -11,66 +11,95 @@
 </head>
 
 <body>
-    <nav class="navbar">
-        <div class="nav-content">
-            <span class="logo">SGH Inteligente</span>
-            <ul class="nav-links">
-                <li><a href="#" class="active" data-target="dashboard">Dashboard</a></li>
-                <li><a href="#" data-target="sensores">Sensores</a></li>
-                <li><a href="#" data-target="historico">Histórico</a></li>
-            </ul>
-        </div>
-    </nav>
+    <main id="auth-screen" class="auth-screen">
+        <form id="login-form" class="auth-panel">
+            <p class="auth-eyebrow">Sistema de Gestão Hídrica</p>
+            <h1>Acesse sua conta</h1>
+            <label for="login-email">Email</label>
+            <input id="login-email" name="email" type="email" autocomplete="username" required>
+            <label for="login-password">Senha</label>
+            <input id="login-password" name="senha" type="password" autocomplete="current-password" required>
+            <button type="submit">Entrar</button>
+            <p id="login-feedback" class="form-feedback" role="status" aria-live="polite"></p>
+        </form>
+    </main>
 
-    <main class="container">
-        
-        <section id="dashboard" class="tab-content">
-            <header class="dashboard-header">
-                <h2>Monitoramento em Tempo Real</h2>
-                <p>Setores Agrícolas - São José dos Campos</p>
-            </header>
-
-            <section id="alerts-area"></section>
-            <section id="sensor-grid" class="grid"></section>
-
-            <section id="threshold-panel" style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); margin-top: 25px;">
-                <h3 style="color: #6D4C41; margin-bottom: 12px;">Limiares da bomba</h3>
-                <form id="threshold-form" style="display: flex; flex-wrap: wrap; gap: 12px; align-items: end;">
-                    <label>Dispositivo<br><input id="threshold-device" value="ESP32_Irrigacao_Gabriel" required></label>
-                    <label>Ligar em <=<br><input id="pump-on-limit" type="number" min="0" max="409" required></label>
-                    <label>Desligar em >=<br><input id="pump-off-limit" type="number" min="0" max="409" required></label>
-                    <button type="submit">Salvar limiares</button>
-                    <span id="threshold-feedback" aria-live="polite"></span>
-                </form>
-            </section>
-
-            <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); margin-top: 25px;">
-                <h3 style="color: #6D4C41; margin-bottom: 15px; font-size: 1.1rem; font-weight: bold;">Tendência de Umidade do Solo (Últimas Horas)</h3>
-                <div style="position: relative; height: 300px; width: 100%;">
-                    <canvas id="historicoGrafico"></canvas>
+    <div id="application-root" class="hidden">
+        <nav class="navbar">
+            <div class="nav-content">
+                <span class="logo">SGH Inteligente</span>
+                <ul class="nav-links">
+                    <li><a href="#" class="active" data-target="dashboard">Dashboard</a></li>
+                    <li><a href="#" data-target="sensores">Sensores</a></li>
+                    <li><a href="#" data-target="historico">Histórico</a></li>
+                    <li id="users-nav-item" class="hidden"><a href="#" data-target="usuarios">Usuários</a></li>
+                </ul>
+                <div class="session-controls">
+                    <span id="session-user"></span>
+                    <button id="logout-button" type="button">Sair</button>
                 </div>
             </div>
-        </section>
+        </nav>
 
-        <section id="sensores" class="tab-content hidden">
-            <header class="dashboard-header">
-                <h2>Gerenciamento de Sensores</h2>
-                <p>Configuração e status dos dispositivos IoT</p>
-            </header>
-            
-            <div id="sensores-table-container"></div>
-        </section>
+        <main class="container">
+            <section id="dashboard" class="tab-content">
+                <header class="dashboard-header">
+                    <h2>Monitoramento em Tempo Real</h2>
+                    <p>Setores Agrícolas - São José dos Campos</p>
+                </header>
+                <section id="alerts-area"></section>
+                <section id="sensor-grid" class="grid"></section>
+                <section id="threshold-panel" style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); margin-top: 25px;">
+                    <h3 style="color: #6D4C41; margin-bottom: 12px;">Limiares da bomba</h3>
+                    <form id="threshold-form" style="display: flex; flex-wrap: wrap; gap: 12px; align-items: end;">
+                        <label>Dispositivo<br><input id="threshold-device" value="ESP32_Irrigacao_Gabriel" required></label>
+                        <label>Ligar em <=<br><input id="pump-on-limit" type="number" min="0" max="409" required></label>
+                        <label>Desligar em >=<br><input id="pump-off-limit" type="number" min="0" max="409" required></label>
+                        <button type="submit">Salvar limiares</button>
+                        <span id="threshold-feedback" aria-live="polite"></span>
+                    </form>
+                </section>
+                <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); margin-top: 25px;">
+                    <h3 style="color: #6D4C41; margin-bottom: 15px; font-size: 1.1rem; font-weight: bold;">Tendência de Umidade do Solo (Últimas Horas)</h3>
+                    <div style="position: relative; height: 300px; width: 100%;">
+                        <canvas id="historicoGrafico"></canvas>
+                    </div>
+                </div>
+            </section>
 
-        <section id="historico" class="tab-content hidden">
-            <header class="dashboard-header">
-                <h2>Histórico de Leituras</h2>
-                <p>Dados consolidados e análise temporal</p>
-            </header>
-            
-            <div id="historico-container"></div>
-        </section>
+            <section id="sensores" class="tab-content hidden">
+                <header class="dashboard-header">
+                    <h2>Gerenciamento de Sensores</h2>
+                    <p>Configuração e status dos dispositivos IoT</p>
+                </header>
+                <div id="sensores-table-container"></div>
+            </section>
 
-    </main>
+            <section id="historico" class="tab-content hidden">
+                <header class="dashboard-header">
+                    <h2>Histórico de Leituras</h2>
+                    <p>Dados consolidados e análise temporal</p>
+                </header>
+                <div id="historico-container"></div>
+            </section>
+
+            <section id="usuarios" class="tab-content hidden">
+                <header class="dashboard-header">
+                    <h2>Gerenciamento de usuários</h2>
+                    <p>Contas e níveis de acesso</p>
+                </header>
+                <form id="user-create-form" class="user-create-form">
+                    <label>Nome<input name="nome" maxlength="100" required></label>
+                    <label>Email<input name="email" type="email" maxlength="254" required></label>
+                    <label>Senha inicial<input name="senha" type="password" minlength="12" maxlength="128" required></label>
+                    <label>Papel<select name="papel"><option value="consulta">Consulta</option><option value="operador">Operador</option><option value="admin">Administrador</option></select></label>
+                    <button type="submit">Criar usuário</button>
+                    <span id="user-feedback" class="form-feedback" role="status" aria-live="polite"></span>
+                </form>
+                <div id="users-table-container"></div>
+            </section>
+        </main>
+    </div>
 
     <script src="js/script.js"></script>
 </body>
