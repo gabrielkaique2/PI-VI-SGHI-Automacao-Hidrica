@@ -295,7 +295,7 @@ O handshake do WebSocket valida o cookie de sessão e a origem de conexão contr
 
 ## Banco de dados
 
-O entry point atual usa SQLite em `backend/dbm.db` por padrão. Configure `DB_DIR` para escolher outro diretório. O schema e os limiares iniciais são preparados na inicialização. O banco legado `sensores.db`, se existir, é migrado para `dbm.db` quando este ainda não existir; faça backup antes de mover ou migrar dados.
+O entry point atual usa SQLite em `backend/dbm.db` por padrão. Configure `DB_DIR` para escolher outro diretório. O schema e os limiares iniciais são preparados na inicialização.
 
 ## Autenticação e CORS
 
