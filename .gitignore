@@ -32,3 +32,5 @@
 *.app
 
 simulacao/build
+backend/node_modules
+backend/dbm.db
