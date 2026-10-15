@@ -29,6 +29,13 @@ applyTo: "frontend/**"
 - Use os requisitos e a documentação do projeto como fonte de verdade para as telas e os fluxos.
 - Diferencie rotas da interface (URLs navegadas pelo usuário) de endpoints da API (URLs chamadas pelo frontend).
 - Mantenha a navegação consistente com as rotas de interface definidas e não invente telas ou fluxos sem requisito.
+- O frontend deve ser responsivo, adaptando-se a diferentes tamanhos de tela e dispositivos e ser mobile-first, priorizando a experiência em dispositivos móveis.
+- Use o MUI para criar componentes responsivos e consistentes com a identidade visual do projeto.
+- Evite criar componentes visuais do zero; prefira os componentes do MUI e, se necessário, estenda-os com estilos personalizados.
+- A tela de login deve seguir a rota /login e deve ser publicamente acessível, sem exigir autenticação. Todas as outras telas devem exigir autenticação e redirecionar para a tela de login se o usuário não estiver autenticado.
+- A tela do dashboard deve seguir a rota /dashboard e ser a primeira tela acessada após o login bem-sucedido.
+- A tela de gestão de usuarios deve seguir a rota /usuarios e ser acessível apenas para usuários autenticados com permissão de administrador.
+- A tela de gestão de limiares deve seguir a rota /limiares e ser acessível apenas para usuários autenticados com permissão de administrador ou produtores.
 
 ## Integração com o backend
 - Use os endpoints e contratos definidos pelo projeto; não invente rotas, parâmetros ou formatos de requisição e resposta.
