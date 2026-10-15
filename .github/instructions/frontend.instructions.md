@@ -17,6 +17,8 @@ applyTo: "frontend/**"
 - Consulte os arquivos de logo, cores e tipografia como referências visuais.
 - Não distorça nem altere o logo.
 - Existem dois assets para identidade visual em modo dark e claro; use-os conforme o tema definido pelo usuário.
+- Consulte a [documentação de instalação do MUI](https://mui.com/material-ui/getting-started/installation/) para configurar a biblioteca.
+- Consulte as [instruções de componentes do MUI](../assets/material-ui-mui-llm.md), salvas em `.github/assets/material-ui-mui-llm.md`.
 - Consulte os assets em `.github/assets/`.
 - Use `.github/assets/identidadeVisualDarkMode.jpg` como referência para o modo escuro.
 - Use `.github/assets/identidadeVisualLightMode.jpg` como referência para o modo claro.
