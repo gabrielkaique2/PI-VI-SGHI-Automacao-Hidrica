@@ -1,30 +1,39 @@
-# SGH Inteligente - Front-end Dashboard
+# SGH Inteligente — Frontend
 
-Este diretório contém a interface web (Front-end) do **Sistema de Gestão Hídrica (SGH)** para automação e monitoramento de umidade do solo em setores agrícolas de São José dos Campos.
+Interface React responsiva para monitoramento e gestão do Sistema de Gestão Hídrica Inteligente. A estrutura visual usa o template Dashboard do MUI como referência, com a identidade visual do projeto nos temas claro e escuro.
 
-A interface foi desenvolvida no formato **SPA (Single Page Application)**, garantindo uma navegação fluida e rápida entre o monitoramento em tempo real, gerenciamento de dispositivos e histórico de leituras.
+## Requisitos
 
-##  Funcionalidades Implementadas
-* **Dashboard em Tempo Real:** Cards dinâmicos que exibem o último estado dos sensores de umidade e atuadores (bomba de irrigação).
-* **Alertas Visuais Automatizados:** Sistema que identifica níveis críticos de umidade (≤ 20%) e dispara avisos visuais de necessidade de irrigação na tela.
-* **Mapeamento de Cores por Status:** 
-  * 🔴 **Crítico (≤ 20%)** -> Alerta vermelho.
-  * 🟡 **Atenção (21% a 40%)** -> Alerta amarelo/laranja.
-  * 🟢 **Ideal (> 40%)** -> Status verde estável.
-* **Gráfico de Tendência:** Integração com a biblioteca **Chart.js** para plotar a curva de umidade por dispositivo.
-* **Tabelas de Gerenciamento e Histórico:** Listagem limpa dos dados armazenados no banco de dados.
+- Node.js 20.19+ ou 22.12+
+- Backend do SGHI em execução na porta 3000
 
-##  Tecnologias Utilizadas
-* **HTML5:** Estruturação semântica da aplicação.
-* **CSS3:** Estilização responsiva e componentes visuais personalizados (cards, barras de progresso, alertas).
-* **JavaScript (ES6+):** Lógica de consumo de API (`fetch`), manipulação dinâmica do DOM e tratamento de tipos de dados.
-* **Chart.js:** Biblioteca externa para renderização do gráfico de linha.
+## Executar localmente
 
-##  Integração com o Back-end
-O front-end está configurado para consumir os dados da API local em:
-`http://localhost:3000/leituras`
+```powershell
+cd frontend
+npm install
+npm run dev
+```
 
-As propriedades dos objetos JSON estão mapeadas conforme a estrutura do banco de dados SQLite (`sensor_id`, `propriedade`, `valor`, `timestamp`).
+Abra `http://localhost:5500`. A porta 5500 corresponde às origens locais permitidas pela configuração padrão do backend. Para outra origem, configure `FRONTEND_ORIGINS` no backend antes de iniciar os serviços.
 
----
-*Desenvolvido como parte do Projeto Integrador V Engenharia da Computação.*
+## Rotas
+
+- `/login`: acesso público.
+- `/dashboard`: leituras recentes e série temporal, disponível para usuários autenticados.
+- `/limiares`: consulta e configuração dos limiares, disponível para `admin` e `operador`.
+- `/usuarios`: gestão de usuários, disponível somente para `admin`.
+
+O tema claro é o padrão. O usuário pode alternar manualmente para o escuro; a preferência fica salva no navegador.
+
+## Integração
+
+O frontend usa os endpoints existentes em `/auth`, `/leituras`, `/config/thresholds/:deviceID` e `/usuarios`, mantendo a autenticação no cookie HTTP-only do backend. As leituras são atualizadas pela API REST e por eventos autenticados no WebSocket `/ws`. Os valores são apresentados como leituras brutas na escala de 0 a 409.
+
+## Build de produção
+
+```powershell
+npm run build
+```
+
+Os arquivos de distribuição são gerados em `frontend/dist`.

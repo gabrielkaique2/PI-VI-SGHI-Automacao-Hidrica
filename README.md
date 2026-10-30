@@ -15,6 +15,9 @@ Análise Remota: Interface web com gráficos comparativos para gestão à distâ
 */backend*: Banco de dados e API de integração.
 */frontend*: Código fonte do site (HTML/CSS/JS) e dashboards.
 
+## Backend e acesso
+O banco SQLite fica em `backend/dbm.db`. O primeiro administrador é criado a partir de `BOOTSTRAP_ADMIN_EMAIL` e `BOOTSTRAP_ADMIN_PASSWORD`; perfis `admin`, `operador` e `consulta` controlam o acesso à interface e à API. Consulte [backend/README.txt](backend/README.txt) para configurar e iniciar o sistema.
+
 🌿 Estratégia de Branches (Organização do Time)
 Para garantir a integridade do código, adotamos o seguinte fluxo:
 main: Versão estável e final para entrega. **Não commitar direto aqui.**
