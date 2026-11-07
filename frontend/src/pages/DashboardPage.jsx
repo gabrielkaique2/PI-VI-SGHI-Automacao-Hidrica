@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Alert, Box, Button, Card, CardContent, Chip, CircularProgress, Paper, Stack, Table,
-  TableBody, TableCell, TableContainer, TableHead, TableRow, Typography
+  Alert, Box, Button, Card, CardContent, Chip, CircularProgress, IconButton, Paper,
+  Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
+  Tooltip as MuiTooltip, Typography
 } from '@mui/material';
 import SensorsOutlinedIcon from '@mui/icons-material/SensorsOutlined';
 import WaterDropOutlinedIcon from '@mui/icons-material/WaterDropOutlined';
+import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import { Line } from 'react-chartjs-2';
 import {
   CategoryScale, Chart as ChartJS, Filler, Legend, LinearScale, LineElement,
@@ -14,6 +16,8 @@ import { apiRequest } from '../api.js';
 import { useRealtime } from '../hooks/useRealtime.js';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend, Filler);
+
+const chartContextHelpText = 'Valores de leitura bruto vindos do ESP32, podendo variar de acordo com o range de trabalho do sensor de leitura de umidade. Atualmente o valor varia de 0 a 409, sendo que valores mais altos indicam maior umidade do solo.';
 
 function formatDate(value) {
   if (!value) return '—';
@@ -133,10 +137,18 @@ export default function DashboardPage() {
 
       <Paper className="content-panel">
         <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1} sx={{ mb: 2 }}>
-          <Box>
+          <Stack direction="row" alignItems="center" spacing={0.5}>
             <Typography variant="h6">Tendência das leituras</Typography>
-            <Typography variant="body2" color="text.secondary">Valores brutos recebidos do sensor (0 a 409).</Typography>
-          </Box>
+            <MuiTooltip title={chartContextHelpText} arrow>
+              <IconButton
+                size="small"
+                aria-label="Explicação sobre o contexto dos dados"
+                sx={{ p: 0.5 }}
+              >
+                <HelpOutlineIcon fontSize="small" />
+              </IconButton>
+            </MuiTooltip>
+          </Stack>
           <Chip label="Últimas 24 leituras" size="small" variant="outlined" />
         </Stack>
         <Box className="chart-area">
