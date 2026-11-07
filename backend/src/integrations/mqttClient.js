@@ -56,6 +56,7 @@ function sendPumpCommand(payload) {
 
 function saveReading(data, pumpCommand, controlStatus) {
   return new Promise((resolve, reject) => {
+    // O sufixo Z indica UTC; o frontend converte para o fuso local ao exibir.
     db.run(
       `INSERT INTO leituras (device_id, propriedade, valor, statusBomba, timestamp)
        VALUES (?, ?, ?, ?, ?)`,
