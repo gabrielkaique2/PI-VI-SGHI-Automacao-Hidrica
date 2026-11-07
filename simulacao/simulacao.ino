@@ -20,7 +20,7 @@ const int PIN_SERVO = 13;
 WiFiClient espClient;
 PubSubClient client(espClient);
 WiFiUDP ntpUDP;
-NTPClient timeClient(ntpUDP, "pool.ntp.org", -10800, 60000);
+NTPClient timeClient(ntpUDP, "pool.ntp.org", 0, 60000);
 Servo servo;
 WebServer controlServer(80);
 bool comandoBombaRecebido = false;
@@ -29,7 +29,7 @@ bool comandoBombaRecebido = false;
 
 void getISO8601Timestamp(char* buffer) {
   time_t rawTime = (time_t)timeClient.getEpochTime();
-  struct tm *ptm = localtime(&rawTime);
+  struct tm *ptm = gmtime(&rawTime);
   sprintf(buffer, "%04d-%02d-%02dT%02d:%02d:%02dZ", 
           ptm->tm_year + 1900, ptm->tm_mon + 1, ptm->tm_mday, 
           ptm->tm_hour, ptm->tm_min, ptm->tm_sec);
